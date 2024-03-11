@@ -48,7 +48,6 @@ const UserSchema = new mongoose.Schema({
     accountType : {
         type : String,
         enum : ["Admin","endUser"],
-        required : true,
     },
     resetPasswordExpires : {
         type : Date,

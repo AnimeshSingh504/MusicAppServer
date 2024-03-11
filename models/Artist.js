@@ -19,6 +19,12 @@ const artistSchema = new mongoose.Schema({
             ref : "song",
         },
     ],
+    albums : [
+        {
+            type : mongoose.Schema.Types.ObjectId,
+            ref : "album",
+        },
+    ],
 });
 
 module.exports = mongoose.model("artist", artistSchema);
