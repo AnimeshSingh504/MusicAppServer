@@ -3,6 +3,8 @@ const OTP = require("otp-generator");
 const User = require("./models/user");
 const Otp = require("./models/OTP");
 const Bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
 
 // User will SignUp
 exports.signUp = async(req,res) => {
@@ -94,21 +96,123 @@ exports.signUp = async(req,res) => {
             accountType = 'user';
         }
 
+        // checking for the user profile Picture
+        if(profilePic === null){
+            profilePic = `https://api.dicebear.com/5.x/initials/svg?seed=${firstName}${lastName}`;
+        }
+
         // now since this things are done
         // we'll save the data of user in DB
 
-        // need to work from here
+        // creating the user and saving the data in the DB
         const UserCreated = await User.create({
             userName,
             mailAddress : mailId,
             password : hashedPassword,
             dateOfRegistration,
             firstName,
-
+            lastName,
+            gender,
+            contactNumber : contact,
+            profilePicture : profilePic,
+            accountType
         });
 
+        // now after the user is created, we return the response to the user
+        return res.status(200).json({
+            success : true,
+            message : "User registered successfully",
+            User,
+        });
 
     }catch(error){
+        console.log(error);
+        return res.status(500).json({
+            success:false,
+            message : "Something went wrong while registering the User",
+        });
+    }
+}
 
+
+// User will signin
+exports.signIn = async(req,res) => {
+
+    try{
+        // here user can provide the userName or mailId for the login
+        let {
+            mailId,
+            password
+        } = req.body;
+
+        // now we'll check for the the inavailabilty of the user credientials received
+        if(!mailId || !password){
+            return res.status(400).json({
+                success : false,
+                message : "Please provide the credientials",
+            });
+        }
+        
+        // now if the credientials are properly available
+
+        // then we'll find out whether the user exists or not 
+
+        const existingUser = await User.findOne({mailId});
+
+        // if there is not user with the mail Id
+        if(!existingUser){
+            return res.status(401).json({
+                success : false,
+                message : "User with this mail ID doesn't exist",
+            });
+        }
+
+        // if the user exists
+        // then we'll compare the password, by again hashing it
+        if(Bcrypt.compare(password, existingUser.password)){
+
+            // now we are creating the payload, that we'll be sending over to the user over http at frontend
+            const payload = {
+                email : existingUser.mailId,
+                accountType : existingUser.accountType,
+                userId : existingUser._id,
+            };
+
+            // now we need to create the token, so we need jwt token
+            const token = jwt.sign(payload, process.env.JWT_SECRET_KEY, {
+                expiresIn : '24h',
+            });
+
+            // now since we created the token, so we'll set the token into the user Schema
+            existingUser.token = token;
+            await existingUser.save();
+
+            // creating the options for the cookie
+            const options = {
+                expiresIn : new Date(Date.now() + 3*24*60*60*1000),
+                httpOnly : true,
+            }
+
+            // now we'll create the cookie, for the seamless authorization and returning it in respose
+            res.cookie("token", token, options).status(200).json({
+                success:true,
+                token,
+                existingUser,
+                message : "User Logged In Successfully",
+            });
+        }
+        else{
+            return res.status(401).json({
+                success : false,
+                message : "Password Incorrect",
+            });
+        }
+
+    }catch(error){
+        console.log(error);
+        return res.status(501).json({
+            success : false,
+            message : "Something went wrong while sign in",
+        });
     }
 }
