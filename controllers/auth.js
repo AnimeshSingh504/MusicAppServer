@@ -87,8 +87,7 @@ exports.signUp = async(req,res) => {
         // so we can create a new user account, 
 
         // but before creating the user account, we have to hash the user password so that no one can read it
-        const salt = 9;
-        const hashedPassword = await Bcrypt.hash(password,salt);
+        const hashedPassword = await Bcrypt.hash(password,process.env.SALT);
 
         // now looking onto the accountType
         
@@ -272,7 +271,7 @@ exports.changePassword = async(req,res) => {
         // now since everything matches
         // so we'll make the hash out of the new password
 
-        const hashedPassword = await Bcrypt.hash(newPassword,9);
+        const hashedPassword = await Bcrypt.hash(newPassword,process.env.SALT);
         // now updated the userdetails
 
         const updatedUserDetails = await User.findByIdAndUpdate(req.user.id, {password : hashedPassword}, {new : true});
@@ -327,6 +326,40 @@ exports.sendOTP = async(req,res) => {
         // if everything is fine, no existing user, and perfect mail ID, then
         // proceed further to send OTP
 
+        let otp = await OTP.generate(process.env.OTP_LENGTH, process.env.OTP_CONFIG);
+
+        // now since OTP has been generated
+        // we have to check out whether at that, current instance of OTP is it saved in the DB or not
+
+        const otpExists = await Otp.findOne({otp : otp});
+
+        // now we'll check and try to generate the otp if the current generated otp is 
+        // already in the system
+
+        while(otpExists){
+            otp = await OTP.generate(process.env.OTP_LENGTH, process.env.OTP_CONFIG);
+
+            otpExists = await  Otp.findOne({otp: otp});
+        }
+
+        // when at the particular instance the otp is unique, the set the otp and send it
+        // to the user for the authentication from the user side
+
+        const otpPayload = {mailId, otp};
+
+        // now to save the otp into the Db to make it persist
+        const newOtp = await OTP.create(otpPayload);
+
+        // now we need to return the res to the user
+
+        return res.status(200).json({
+            success : true,
+            message : "OTP sent successfully",
+            otp,
+        });
+
+        // [TODO] :  We need to check about the sending of OTP
+        
     }catch(error){
         return res.status(402).json({
             success : false,
