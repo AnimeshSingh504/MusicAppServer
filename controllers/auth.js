@@ -118,6 +118,9 @@ exports.signUp = async(req,res) => {
             accountType
         });
 
+        // now we need to send the mail to the user to tell, about successful registration
+        // TODO
+
         // now after the user is created, we return the response to the user
         return res.status(200).json({
             success : true,
@@ -214,5 +217,121 @@ exports.signIn = async(req,res) => {
             success : false,
             message : "Something went wrong while sign in",
         });
+    }
+}
+
+// change password
+
+exports.changePassword = async(req,res) => {
+
+    try{
+
+        const userId = req.user.id;
+        
+        // fetch the password, old, new and confirm passwords
+
+        const {
+            oldPassword,
+            newPassword,
+            confirmNewPassword
+        } = req.body;
+
+        if(!oldPassword || !newPassword || !confirmPassword){
+            return res.status(400).json({
+                success : false,
+                message : "Please provide all the details",
+            });
+        }
+
+        // now making the DB call to fetch out the password
+        const userDetails = await User.findById(userId);
+
+        // now since we have got all the passwords, so we'll compare the old
+        // password and the password that is saved in the DB
+
+        const samePassword = await Bcrypt.compare(oldPassword, userDetails.password);
+
+        if(!samePassword){
+            return res.status(400).json({
+                success : false,
+                message : "Old Password is incorrect",
+            });
+        }
+
+        // now since the data is successfully fetched and the old password is also correct
+
+        // so now we'll check out the new and confirm new password
+
+        if(newPassword !== confirmNewPassword) {
+            return res.status(400).json({
+                success : false,
+                message : "New Password and Confirm New Password doesn't match",
+            });
+        }
+
+        // now since everything matches
+        // so we'll make the hash out of the new password
+
+        const hashedPassword = await Bcrypt.hash(newPassword,9);
+        // now updated the userdetails
+
+        const updatedUserDetails = await User.findByIdAndUpdate(req.user.id, {password : hashedPassword}, {new : true});
+        
+        // now we'll send the mail to the user, regarding successfull change of password
+        // TODO
+
+        return res.status(200).json({
+            success : true,
+            message : "Password Updated Successfully",
+        });
+
+    }catch(error){
+        console.log(error);
+        return res.status(402).json({
+            success : false,
+            message : "Something went wrong while changing password",
+            error : error.message,
+        });
+    }
+
+}
+
+// send OTP controller
+
+exports.sendOTP = async(req,res) => {
+
+    try{
+
+        // so we'll get the mailID from the req.body
+
+        const {mailId} = req.body;
+
+        if(!mailId){
+            return res.status(400).json({
+                success : false,
+                message : "Please provide the mail ID",
+            });
+        }
+
+        // now check whether the mail Id is already registered
+
+        const existingUser = await User.findOne({mailAddress : mailId});
+
+        if(existingUser){
+            return res.status(403).json({
+                success : false,
+                message : "User already registred with this mail",
+            });
+        }
+
+        // if everything is fine, no existing user, and perfect mail ID, then
+        // proceed further to send OTP
+
+    }catch(error){
+        return res.status(402).json({
+            success : false,
+            message : "Something went wrong while sending OTP",
+            error : error.message,
+        })
     }
 }
